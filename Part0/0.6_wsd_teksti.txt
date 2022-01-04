@@ -1,9 +1,0 @@
-selain->palvelin: HTTP POST https://studies.cs.helsinki.fi/exampleapp/new_note_spa
-palvelin-->selain: HTTP status 201 (created)
-
-note over selain:
-HTTP post lähettää muistiinpanon palvelimelle, 
-jossa se lisätään tietokantaan.
-DOM päivittää muutoksen käyttäjän näkyviin
-ilman sivun uudelleenlatausta
-end note
