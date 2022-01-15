@@ -1,5 +1,31 @@
+// npm run server
+
 import React, { useEffect, useState } from 'react'
-import axios from 'axios'
+// import axios from 'axios'
+import personService from './services/persons'
+
+const Notification = ({message}) => {
+  if (message === null) { 
+    return null
+  }
+  return (
+    <div className="notification">
+      {message}
+    </div> 
+  )
+}
+
+const Error = ({message}) => {
+  if (message === null) { 
+    return null
+  }
+  return (
+    <div className="error">
+      {message}
+    </div> 
+  )
+}
+
 
 const FilterForm = ({newFilter, handleFilterChange}) => {
   return (
@@ -30,71 +56,101 @@ const PersonForm = ({addPerson, newName, newNumber, handleNameChange, handleNumb
   )
 }
 
-const Person = ({person}) => {
+const Person = ({person, deletePerson}) => {
+  // {console.log(person)}
+  // console.log("typeof value inside Person component:", typeof(person))
   return (
-    <p>{person.name} {person.number}</p>
+    <div>
+      <p>
+        {person.name} {person.number} <button onClick={deletePerson(person)}>delete</button>
+      </p>
+    </div>
+    
   )
 }
 
-const Persons = ({persons}) => {
-  // console.log("persons is", persons)
-  // console.log("persons[0] is", persons.[0].name)
-  
-  
-  
-  // persons.map(person => console.log(person.name))
-  // persons.map(person => console.log("Person x", person))
+const Persons = ({persons, deletePerson}) => {
   return (
     
     <div>
-      {/* {persons.map(person => console.log(person))} */}
-      {persons.map(person => <Person key={person.name} person={person}/>)}
+      {persons.map(person => <Person key={person.name} person={person} deletePerson={deletePerson}/>)}
     </div>
   )
 }
 
 
 const App = () => {
-  // const [persons, setPersons] = useState([
-  //   { name: 'Arto Hellas', number: '040-123456' },
-  //   { name: 'Ada Lovelace', number: '39-44-5323523' },
-  //   { name: 'Dan Abramov', number: '12-43-234345' },
-  //   { name: 'Mary Poppendieck', number: '39-23-6423122' }
-  // ])
   const [persons, setPersons] = useState([])
   const [newName, setNewName] = useState('')
   const [newNumber, setNewNumber] = useState('')
   const [newFilter, setNewFilter] = useState('')
+  const [notification, setNotification] = useState(null)
+  const [error, setError] = useState(null)
 
 
 
 
   const hook = () => {
-    console.log('effect')
-    axios
-      .get('http://localhost:3001/persons')
-      .then(response => {
-        console.log('promise fulfilled')
-        setPersons(response.data)
+    personService
+      .getAll()
+      .then(initialPersons => {
+        setPersons(initialPersons)
       })
+      .catch(error => console.log("An error occurred...", error))
   }
 
   useEffect(hook,[])
 
-  // console.log("persons are:", persons)
-
   const addPerson = (event) => {
     event.preventDefault()
-    const personObject = {
+    const newPerson = {
       name: newName,
       number: newNumber
-    }   
-    const nameInPersons = persons.map(person => person.name.toLowerCase()).includes(personObject.name.toLowerCase())
+    }
+    const findPerson = persons.find(person =>  person.name.toLowerCase().trim() === newName.toLowerCase().trim())
+    if (findPerson && window.confirm(`${findPerson.name} is already added in the phonebook, replace the old number with a new one?`)) {
+      personService
+      .update(findPerson.id, newPerson)
+      .then(response => {
+        setPersons(persons.map(person => person.id !== findPerson.id ? person : response)) //korvaa personObject uudella...)
+        setNewName('')
+        setNewNumber('')
+        setNotification(`Updated ${newPerson.name}'s number`)
+        setTimeout(() => {
+          setNotification(null)
+        }, 5000)
+      })
+      .catch(error => {
+        console.log("An error occurred...", error)
+        setError(`${newPerson.name} had been removed from the server. Please refresh the page and add the person again`)
+        setTimeout(() => {
+          setError(null)
+        }, 5000)
+      })
+    }
+    
+    else 
+    personService
+    .create(newPerson)
+    .then(response => {
+      setPersons(persons.concat(response))
+      setNewName('')
+      setNewNumber('')
+      setNotification(`Added ${newPerson.name}`)
+      setTimeout(() => {
+        setNotification(null)
+      }, 5000)
+    })
+    .catch(error => {
+      console.log("An error occurred...", error)
+      setError(`Some weird error occurred. Try if refreshing the page would fix the issue.`)
+      setTimeout(() => {
+        setError(null)
+      }, 5000)
+      
+    })
+    
 
-    if (nameInPersons) alert(`${personObject.name} is already added to phonebook`) //this is
-    else setPersons(persons.concat(personObject))
-    setNewName('')
-    setNewNumber('')
   }
 
   const handleNameChange = (event) => {
@@ -109,16 +165,40 @@ const App = () => {
     setNewFilter(event.target.value)
   }
 
+  const deletePerson = deletePerson => () => {
+    if (window.confirm(`Delete ${deletePerson.name} ?`)) {
+      personService
+      .deleteObject(deletePerson.id)
+      .then(response => {
+        if (response === "OK") {
+          setPersons(persons.filter(person => person.id !== deletePerson.id))
+          setNotification(`Deleted ${deletePerson.name}`)
+          setTimeout(() => {
+            setNotification(null)
+          }, 5000)
+        } 
+        
+      })
+      .catch(error => {
+        console.log("An error occurred...", error)
+        setError(`${deletePerson.name} had already been removed from server`)
+        setPersons(persons.filter(person => person.id !== deletePerson.id))
+        setTimeout(() => {
+          setError(null)
+        }, 5000)
+      })
+
+    }
+  }
   const personsToShow = persons.filter(person => person.name.toLowerCase().includes(newFilter.toLowerCase()))
-  // console.log("persons to show",personsToShow)
 
   return (
     <div>
+      <Error message={error}/>
+      <Notification message={notification}/>
       <h2>Phonebook</h2>
       <FilterForm newFilter={newFilter} handleFilterChange={handleFilterChange}/> 
-
       <h2>add a new</h2>
-
       <PersonForm 
       addPerson={addPerson}
       newName={newName}
@@ -126,10 +206,8 @@ const App = () => {
       handleNameChange={handleNameChange} 
       handleNumberChange={handleNumberChange
       }/>
-
-      <h2>Numbers</h2>
-      
-      <Persons persons={personsToShow}/>
+      <h2>Numbers</h2>      
+      <Persons persons={personsToShow} deletePerson={deletePerson}/>
       
     </div>
   )
